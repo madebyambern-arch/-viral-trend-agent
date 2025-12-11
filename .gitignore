@@ -107,5 +107,6 @@ venv.bak/
 *_trending_*.csv
 *_niches_*.csv
 *_creators_*.csv
+*_backup_*.csv
 viral_posts_export.csv
 analysis_report.csv
