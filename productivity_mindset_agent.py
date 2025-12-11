@@ -537,7 +537,7 @@ class ProductivityMindsetAgent:
         hashtag_pool = {
             "productivity": [
                 "#productivity", "#productivityhacks", "#timemanagement",
-                "#getthingsdone", "#efficency", "#worksmarter", "#focusmode",
+                "#getthingsdone", "#efficiency", "#worksmarter", "#focusmode",
                 "#productivitytips", "#organize", "#planning"
             ],
             "mindset": [
