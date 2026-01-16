@@ -6,6 +6,9 @@ example_output_*.csv
 analysis_report.csv
 viral_posts_export.csv
 
+# Action Claims Agent state files
+claims_state.json
+
 # Python
 __pycache__/
 *.py[cod]
