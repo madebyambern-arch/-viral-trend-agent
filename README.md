@@ -101,7 +101,6 @@ python claims_cli.py scheduled --interval 86400
 ```
 
 See [ACTION_CLAIMS_README.md](ACTION_CLAIMS_README.md) for complete documentation.
-```
 
 This will:
 1. Analyze 12+ viral posts in the productivity/mindset niche
