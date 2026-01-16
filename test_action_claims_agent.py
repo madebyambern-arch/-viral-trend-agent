@@ -412,23 +412,35 @@ class TestActionClaimsAgent(unittest.TestCase):
     
     def test_agent_multiple_runs(self):
         """Test running agent multiple times to detect changes."""
+        # Note: Creating separate agents and state files to avoid race conditions
+        import tempfile
+        
         client = StubClaimsClient()
         notifier = ConsoleNotifier()
-        agent = ActionClaimsAgent(
+        
+        # First run with its own state file
+        state_file1 = os.path.join(self.temp_dir, 'state1.json')
+        agent1 = ActionClaimsAgent(
             data_client=client,
-            state_file=self.state_file,
+            state_file=state_file1,
             notifier=notifier
         )
+        results1 = agent1.run()
         
-        # First run
-        results1 = agent.run()
-        
-        # Second run - should detect changes
-        results2 = agent.run()
+        # Second run - reusing the first state file to test state persistence
+        # Use a fresh agent instance
+        agent2 = ActionClaimsAgent(
+            data_client=StubClaimsClient(),  # Fresh client too
+            state_file=state_file1,
+            notifier=ConsoleNotifier()  # Fresh notifier
+        )
+        results2 = agent2.run()
         
         # Both runs should complete successfully
         self.assertIsNotNone(results1)
         self.assertIsNotNone(results2)
+        self.assertIn('total_claims', results1)
+        self.assertIn('total_claims', results2)
 
 
 class TestExpirationTracking(unittest.TestCase):
