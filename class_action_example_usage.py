@@ -144,7 +144,7 @@ print()
 print("EXAMPLE 7: Filter Claims by Category")
 print("-" * 70)
 
-categories = agent._get_claims_by_category()
+categories = agent.get_claims_by_category()
 
 print("Claims by category:")
 for category, count in sorted(categories.items()):

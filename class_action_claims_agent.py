@@ -15,8 +15,7 @@ Features:
 import json
 import os
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Tuple
-from pathlib import Path
+from typing import List, Dict, Any, Optional
 
 
 # ============================================================================
@@ -466,13 +465,13 @@ class ClassActionClaimsAgent:
             "total_recent_payouts": len(recent_payouts),
             "notifications_count": len(notifications),
             "notifications": notifications,
-            "claims_by_category": self._get_claims_by_category(),
+            "claims_by_category": self.get_claims_by_category(),
             "expiring_soon": len([c for c in active_claims if c.is_expiring_soon(30)])
         }
         
         return summary
     
-    def _get_claims_by_category(self) -> Dict[str, int]:
+    def get_claims_by_category(self) -> Dict[str, int]:
         """Get count of claims by category."""
         category_counts = {}
         for claim in self.current_claims:
