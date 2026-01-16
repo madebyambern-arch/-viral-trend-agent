@@ -10,7 +10,6 @@ Comprehensive test suite covering:
 """
 
 import unittest
-import json
 import tempfile
 import os
 from datetime import datetime, timedelta
