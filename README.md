@@ -1,12 +1,36 @@
-# 🚀 Viral Content Finder - Productivity/Mindset Niche
+# 🚀 Viral Trend Agent Repository
+
+A collection of powerful automation tools for content creation and action tracking.
+
+## 📋 Repository Overview
+
+This repository contains multiple agent modules:
+
+1. **Viral Content Finder** - Analyzes viral content patterns in the Productivity/Mindset niche and generates batch-ready content ideas
+2. **Action Claims Agent** - Tracks action claims, monitors payouts, and sends notifications about expirations and changes
+
+## 🎯 Modules
+
+### 1. Viral Content Finder - Productivity/Mindset Niche
 
 A powerful tool to find viral entertainment content in the Productivity/Mindset niche that can be batch created and posted to your social media pages.
 
-## 📋 Overview
-
 This tool analyzes viral content patterns from top creators in the productivity and mindset space, then generates batch-ready content ideas that you can quickly create and post across multiple social media platforms.
 
-## ✨ Features
+### 2. Action Claims Agent
+
+A lightweight Python agent for tracking action claims, monitoring payouts, and sending notifications about claim expirations and new payouts. Features include:
+- Data models for claims and payouts
+- Pluggable scraping/API integration interfaces
+- State persistence with JSON storage
+- Payout tracking and change detection
+- Email/console notifications
+- GitHub Actions scheduling support
+- Comprehensive CLI interface
+
+📖 **[Read the Action Claims Agent Documentation](ACTION_CLAIMS_README.md)**
+
+## ✨ Viral Content Finder Features
 
 - 🔍 **Viral Content Analysis**: Analyzes trending posts to identify viral patterns
 - 📊 **Category Performance**: Breaks down performance by content category (productivity, mindset, habits, etc.)
@@ -15,6 +39,18 @@ This tool analyzes viral content patterns from top creators in the productivity 
 - 📱 **Platform-Specific Formatting**: Formats posts for Instagram, TikTok, and YouTube
 - 📅 **Posting Schedule**: Provides optimal posting times and frequencies
 - 💾 **Export Functionality**: Exports all data to JSON for easy access
+
+## ✨ Action Claims Agent Features
+
+- 📊 **Data Models**: Clean dataclasses for claims and payouts
+- 🔌 **Pluggable Architecture**: Extensible scraping/API client interfaces  
+- 💰 **Payout Tracking**: Automatic detection of new payouts
+- ⏰ **Expiration Tracking**: Monitors claim expiration dates
+- 💾 **State Persistence**: JSON-based state tracking with change detection
+- 📧 **Notifications**: Email and console notification support
+- 🤖 **Scheduling**: GitHub Actions integration for automated runs
+- 🖥️ **CLI Interface**: Command-line interface for manual and scheduled runs
+- ✅ **Tested**: Comprehensive test suite
 
 ## 🎯 Supported Content Categories
 
@@ -42,12 +78,29 @@ cd -viral-trend-agent
 
 ## 🚀 Quick Start
 
-### Basic Usage
+### Viral Content Finder
 
 Run the main script to analyze viral content and generate batch ideas:
 
 ```bash
 python3 productivity_mindset_agent.py
+```
+
+### Action Claims Agent
+
+Run the claims agent once:
+
+```bash
+python claims_cli.py run-once
+```
+
+Run on a schedule (every 24 hours):
+
+```bash
+python claims_cli.py scheduled --interval 86400
+```
+
+See [ACTION_CLAIMS_README.md](ACTION_CLAIMS_README.md) for complete documentation.
 ```
 
 This will:

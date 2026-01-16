@@ -1,0 +1,70 @@
+name: Action Claims Agent - Daily Run
+
+on:
+  schedule:
+    # Run daily at 9:00 AM UTC
+    - cron: '0 9 * * *'
+  
+  workflow_dispatch:
+    # Allow manual trigger
+    inputs:
+      state_file:
+        description: 'Path to state file'
+        required: false
+        default: 'claims_state.json'
+
+jobs:
+  run-claims-agent:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Cache state file
+        uses: actions/cache@v3
+        with:
+          path: claims_state.json
+          key: claims-state-${{ github.run_id }}
+          restore-keys: |
+            claims-state-
+      
+      - name: Run Action Claims Agent
+        id: run-agent
+        env:
+          STATE_FILE: ${{ github.event.inputs.state_file || 'claims_state.json' }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || 'smtp.gmail.com' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
+        run: |
+          python claims_cli.py github-actions
+      
+      - name: Upload state file as artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: claims-state
+          path: claims_state.json
+          retention-days: 30
+      
+      - name: Report results
+        if: always()
+        run: |
+          echo "## Action Claims Agent Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run Time**: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow**: ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run Number**: ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f claims_state.json ]; then
+            echo "✅ State file created/updated successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ State file not found" >> $GITHUB_STEP_SUMMARY
+          fi
