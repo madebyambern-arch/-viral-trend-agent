@@ -6,6 +6,10 @@ example_output_*.csv
 analysis_report.csv
 viral_posts_export.csv
 
+# Class action claims agent files
+class_action_state.json
+class_action_report_*.json
+
 # Python
 __pycache__/
 *.py[cod]

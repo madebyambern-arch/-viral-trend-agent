@@ -1,10 +1,167 @@
-# 🚀 Viral Content Finder - Productivity/Mindset Niche
+# 🚀 Viral Trend Agent Suite
 
-A powerful tool to find viral entertainment content in the Productivity/Mindset niche that can be batch created and posted to your social media pages.
+A collection of powerful automation agents for content creation and legal settlements monitoring.
 
 ## 📋 Overview
 
-This tool analyzes viral content patterns from top creators in the productivity and mindset space, then generates batch-ready content ideas that you can quickly create and post across multiple social media platforms.
+This repository contains multiple specialized agents:
+
+### 1. 🎬 Productivity/Mindset Content Finder
+Analyzes viral content patterns from top creators in the productivity and mindset space, then generates batch-ready content ideas that you can quickly create and post across multiple social media platforms.
+
+### 2. ⚖️ Class Action Claims Agent (NEW!)
+Monitors active class action claims and payouts, tracks expiration dates, and sends daily notifications only when there are changes (expiring claims or new payouts announced).
+
+---
+
+## ⚖️ Class Action Claims Agent
+
+### Features
+
+- 🔍 **Active Claims Search**: Automatically searches for all active class action claims
+- ⏰ **Expiration Tracking**: Monitors claims approaching their filing deadline
+- 💰 **Payout Monitoring**: Tracks newly announced settlements and payouts
+- 📢 **Smart Notifications**: Only notifies when there are changes (no spam!)
+- 💾 **State Persistence**: Remembers previous runs to detect changes
+- 🗓️ **Daily Scheduling**: Designed to run as a daily automated task
+- 📊 **Detailed Reports**: Generates comprehensive JSON reports
+
+### Quick Start - Claims Agent
+
+Run the claims agent to check for updates:
+
+```bash
+python3 class_action_claims_agent.py
+```
+
+**First Run Output:**
+- Lists all active claims
+- Shows claims expiring within 30 days
+- Displays recent payouts
+- Saves state for future comparisons
+
+**Subsequent Runs:**
+- Only shows NEW notifications:
+  - Claims becoming "expiring soon"
+  - Claims that expired since last run
+  - Newly announced payouts
+
+### Example Output
+
+```
+================================================================================
+CLASS ACTION CLAIMS AGENT - DAILY REPORT
+================================================================================
+Run Date: 2026-01-16 07:08:35
+
+📊 SUMMARY
+--------------------------------------------------------------------------------
+Total Active Claims: 5
+Claims Expiring Soon (30 days): 2
+Recent Payouts (30 days): 2
+Notifications: 4
+
+🔔 NOTIFICATIONS
+--------------------------------------------------------------------------------
+
+⚠️  EXPIRING CLAIMS:
+
+  • ABC Electronics Product Defect Settlement
+    Claim expires in 14 days
+    Deadline: 2026-01-31
+    Amount: Up to $350 or replacement
+    URL: https://example.com/abc-settlement
+
+💰 NEW PAYOUTS:
+
+  • MNO Bank Overdraft Fee Settlement Payout
+    New payout announced: $87.5 million total fund
+    Announced: 2026-01-14
+    Distribution: 2026-02-15
+    URL: https://example.com/mno-payout
+```
+
+### Daily Scheduling
+
+**Linux/Mac (cron):**
+```bash
+# Run daily at 9 AM
+0 9 * * * cd /path/to/-viral-trend-agent && python3 class_action_claims_agent.py
+```
+
+**Windows (Task Scheduler):**
+1. Open Task Scheduler
+2. Create Basic Task
+3. Set trigger: Daily at 9:00 AM
+4. Action: Start a program
+5. Program: `python3`
+6. Arguments: `class_action_claims_agent.py`
+7. Start in: `C:\path\to\-viral-trend-agent`
+
+### Claims Categories
+
+The agent monitors claims in these categories:
+- 📊 Data Breach
+- 🛒 Consumer Products
+- 💼 Securities
+- ⚖️ Antitrust
+- 👥 Employment
+- 🏥 Insurance
+- 🚗 Automotive
+- 📱 Telecommunications
+
+### Integration Examples
+
+**Email Notifications:**
+```python
+from class_action_claims_agent import ClassActionClaimsAgent
+
+agent = ClassActionClaimsAgent()
+summary = agent.run()
+
+for notif in summary['notifications']:
+    if notif['severity'] == 'high':
+        send_email_alert(notif)
+```
+
+**Slack/Discord Webhooks:**
+```python
+for notif in summary['notifications']:
+    webhook_url = "https://hooks.slack.com/..."
+    requests.post(webhook_url, json={"text": notif['message']})
+```
+
+### Advanced Usage
+
+See `class_action_example_usage.py` for detailed examples including:
+- Filtering claims by category
+- Finding high-priority claims
+- Exporting reports
+- Custom integrations
+
+### Production Setup
+
+To use real data instead of mock data:
+
+1. **Replace mock functions** in `class_action_claims_agent.py`:
+   - `generate_mock_claims()` → Connect to real APIs/scrapers
+   - `generate_mock_payouts()` → Connect to payout tracking systems
+
+2. **Popular data sources to integrate:**
+   - ClassAction.org
+   - TopClassActions.com
+   - JND Legal Administration
+   - Settlement-specific websites
+
+3. **Add notification delivery:**
+   - Email (SMTP)
+   - SMS (Twilio)
+   - Slack/Discord webhooks
+   - Database logging
+
+---
+
+## 🎬 Productivity/Mindset Content Finder
 
 ## ✨ Features
 
