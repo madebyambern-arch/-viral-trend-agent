@@ -85,7 +85,11 @@ class ClaimsCLI:
         print("🚀 Running Action Claims Agent (single run mode)\n")
         
         agent = self._create_agent(args)
-        results = agent.run()
+        try:
+            results = agent.run()
+        except Exception as e:
+            print(f"\n❌ Run failed: {e}")
+            return 1
         
         print("\n✅ Run completed successfully!")
         return 0
