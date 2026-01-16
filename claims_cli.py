@@ -16,7 +16,8 @@ from action_claims_agent import (
     ActionClaimsAgent,
     StubClaimsClient,
     EmailNotifier,
-    ConsoleNotifier
+    ConsoleNotifier,
+    Notifier
 )
 
 
