@@ -18,7 +18,7 @@ import json
 import os
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Protocol
+from typing import List, Dict, Any, Optional, Protocol, Tuple
 from abc import ABC, abstractmethod
 from pathlib import Path
 import smtplib
@@ -396,7 +396,7 @@ class EmailNotifier(Notifier):
             print(f"✗ Failed to send email notification: {e}")
             return False
     
-    def format_changes_notification(self, changes: Dict[str, List[Claim]]) -> tuple[str, str]:
+    def format_changes_notification(self, changes: Dict[str, List[Claim]]) -> Tuple[Optional[str], Optional[str]]:
         """Format changes into email subject and body."""
         # Count changes
         total_changes = (

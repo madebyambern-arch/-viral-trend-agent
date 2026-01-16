@@ -413,8 +413,6 @@ class TestActionClaimsAgent(unittest.TestCase):
     def test_agent_multiple_runs(self):
         """Test running agent multiple times to detect changes."""
         # Note: Creating separate agents and state files to avoid race conditions
-        import tempfile
-        
         client = StubClaimsClient()
         notifier = ConsoleNotifier()
         

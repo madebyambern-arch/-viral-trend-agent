@@ -37,7 +37,7 @@ class ClaimsCLI:
         self.running = False
         sys.exit(0)
     
-    def _create_notifier(self, args) -> ConsoleNotifier:
+    def _create_notifier(self, args) -> Notifier:
         """Create notifier based on configuration."""
         # Check if email configuration is provided
         smtp_host = args.smtp_host or os.getenv('SMTP_HOST', 'smtp.gmail.com')
