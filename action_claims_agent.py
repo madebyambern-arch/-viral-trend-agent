@@ -308,8 +308,7 @@ class StateManager:
         changes = {
             "new_claims": [],
             "expired_claims": [],
-            "new_payouts": [],  # Will be list of tuples (claim, payout_dict)
-            "updated_claims": []
+            "new_payouts": []  # Will be list of tuples (claim, payout_dict)
         }
         
         # Check for new claims
