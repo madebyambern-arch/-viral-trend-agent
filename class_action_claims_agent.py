@@ -10,11 +10,18 @@ Features:
 - Monitor new payouts
 - Daily notifications for changes only
 - State persistence to track changes between runs
+- CLI with configurable options
+- Email notifications via SMTP
 """
 
+import argparse
 import json
 import os
+import smtplib
+from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import List, Dict, Any, Optional
 
 
@@ -34,8 +41,10 @@ CLAIMS_CATEGORIES = [
     "telecommunications"
 ]
 
-# State file to track previous runs
-STATE_FILE = "class_action_state.json"
+# Default configuration
+DEFAULT_STATE_FILE = "class_action_state.json"
+DEFAULT_EXPIRING_WINDOW_DAYS = 30
+DEFAULT_RECENT_PAYOUT_WINDOW_DAYS = 30
 
 
 # ============================================================================
@@ -253,6 +262,149 @@ def generate_mock_payouts() -> List[Payout]:
 
 
 # ============================================================================
+# NOTIFIER INTERFACE AND IMPLEMENTATIONS
+# ============================================================================
+
+class Notifier(ABC):
+    """Abstract base class for notification systems."""
+    
+    @abstractmethod
+    def send(self, notifications: List[Dict[str, Any]], summary: Dict[str, Any]) -> bool:
+        """Send notifications. Returns True if successful."""
+        pass
+
+
+class EmailNotifier(Notifier):
+    """Email notifier using SMTP."""
+    
+    def __init__(self, 
+                 smtp_host: Optional[str] = None,
+                 smtp_port: Optional[int] = None,
+                 smtp_username: Optional[str] = None,
+                 smtp_password: Optional[str] = None,
+                 smtp_from: Optional[str] = None,
+                 smtp_to: Optional[str] = None,
+                 use_starttls: bool = True):
+        """
+        Initialize email notifier with SMTP settings.
+        Falls back to environment variables if parameters not provided.
+        """
+        self.smtp_host = smtp_host or os.environ.get('SMTP_HOST', '')
+        self.smtp_port = smtp_port or int(os.environ.get('SMTP_PORT', '587'))
+        self.smtp_username = smtp_username or os.environ.get('SMTP_USERNAME', '')
+        self.smtp_password = smtp_password or os.environ.get('SMTP_PASSWORD', '')
+        self.smtp_from = smtp_from or os.environ.get('SMTP_FROM', '')
+        self.smtp_to = smtp_to or os.environ.get('SMTP_TO', '')
+        self.use_starttls = use_starttls
+        
+        # Validate configuration
+        if not all([self.smtp_host, self.smtp_from, self.smtp_to]):
+            raise ValueError("SMTP_HOST, SMTP_FROM, and SMTP_TO must be configured")
+    
+    def send(self, notifications: List[Dict[str, Any]], summary: Dict[str, Any]) -> bool:
+        """Send email notification with summary of changes."""
+        if not notifications:
+            # No changes, no email
+            return True
+        
+        try:
+            # Create message
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = f"Class Action Claims Alert - {len(notifications)} Update(s)"
+            msg['From'] = self.smtp_from
+            msg['To'] = self.smtp_to
+            
+            # Format email body
+            body = self._format_email_body(notifications, summary)
+            msg.attach(MIMEText(body, 'plain'))
+            
+            # Send email
+            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                if self.use_starttls:
+                    server.starttls()
+                if self.smtp_username and self.smtp_password:
+                    server.login(self.smtp_username, self.smtp_password)
+                server.send_message(msg)
+            
+            return True
+        except Exception as e:
+            print(f"Error sending email notification: {e}")
+            return False
+    
+    def _format_email_body(self, notifications: List[Dict[str, Any]], summary: Dict[str, Any]) -> str:
+        """Format email body with notification details."""
+        lines = []
+        lines.append("CLASS ACTION CLAIMS DAILY ALERT")
+        lines.append("=" * 70)
+        lines.append(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append(f"Total Updates: {len(notifications)}")
+        lines.append("")
+        
+        # Group notifications by type
+        expiring = [n for n in notifications if n['type'] == 'expiring_claim']
+        expired = [n for n in notifications if n['type'] == 'expired_claim']
+        new_payouts = [n for n in notifications if n['type'] == 'new_payout']
+        
+        if expiring:
+            lines.append(f"⚠️  EXPIRING CLAIMS ({len(expiring)}):")
+            lines.append("-" * 70)
+            for notif in expiring:
+                lines.append(f"\n• {notif['title']}")
+                lines.append(f"  {notif['message']}")
+                lines.append(f"  Deadline: {notif['filing_deadline']}")
+                lines.append(f"  Amount: {notif['amount']}")
+                lines.append(f"  URL: {notif['url']}")
+            lines.append("")
+        
+        if expired:
+            lines.append(f"❌ EXPIRED CLAIMS ({len(expired)}):")
+            lines.append("-" * 70)
+            for notif in expired:
+                lines.append(f"\n• {notif['title']}")
+                lines.append(f"  Expired: {notif['filing_deadline']}")
+                lines.append(f"  URL: {notif['url']}")
+            lines.append("")
+        
+        if new_payouts:
+            lines.append(f"💰 NEW PAYOUTS ({len(new_payouts)}):")
+            lines.append("-" * 70)
+            for notif in new_payouts:
+                lines.append(f"\n• {notif['title']}")
+                lines.append(f"  Amount: {notif['amount']}")
+                lines.append(f"  Announced: {notif['announcement_date']}")
+                lines.append(f"  Distribution: {notif['distribution_date']}")
+                lines.append(f"  URL: {notif['url']}")
+            lines.append("")
+        
+        lines.append("=" * 70)
+        lines.append("This is an automated alert. Updates are sent only when changes occur.")
+        
+        return "\n".join(lines)
+
+
+class ConsoleNotifier(Notifier):
+    """Console notifier for testing and default behavior."""
+    
+    def send(self, notifications: List[Dict[str, Any]], summary: Dict[str, Any]) -> bool:
+        """Print notifications to console."""
+        if not notifications:
+            print("✅ NO NEW NOTIFICATIONS - All claims unchanged since last run")
+            return True
+        
+        print(f"\n🔔 {len(notifications)} NOTIFICATION(S):")
+        print("=" * 70)
+        
+        for notif in notifications:
+            print(f"\n[{notif['type'].upper()}] {notif['title']}")
+            print(f"  {notif['message']}")
+            if 'url' in notif:
+                print(f"  {notif['url']}")
+        
+        print("\n" + "=" * 70)
+        return True
+
+
+# ============================================================================
 # CLASS ACTION CLAIMS AGENT
 # ============================================================================
 
@@ -262,8 +414,20 @@ class ClassActionClaimsAgent:
     Tracks state between runs and notifies only on changes.
     """
     
-    def __init__(self, state_file: str = STATE_FILE):
+    def __init__(self, 
+                 state_file: Optional[str] = None,
+                 expiring_window_days: int = DEFAULT_EXPIRING_WINDOW_DAYS,
+                 recent_payout_window_days: int = DEFAULT_RECENT_PAYOUT_WINDOW_DAYS,
+                 notifier: Optional[Notifier] = None):
+        # Allow state file override via parameter or environment variable
+        if state_file is None:
+            state_file = os.environ.get('CLASS_ACTION_STATE_FILE', DEFAULT_STATE_FILE)
+        
         self.state_file = state_file
+        self.expiring_window_days = expiring_window_days
+        self.recent_payout_window_days = recent_payout_window_days
+        self.notifier = notifier or ConsoleNotifier()
+        
         self.current_claims: List[Claim] = []
         self.current_payouts: List[Payout] = []
         self.previous_state: Optional[Dict[str, Any]] = None
@@ -286,8 +450,14 @@ class ClassActionClaimsAgent:
         state = {
             "last_run": datetime.now().isoformat(),
             "claims": [claim.to_dict() for claim in self.current_claims],
-            "payouts": [payout.to_dict() for payout in self.current_payouts]
+            "payouts": [payout.to_dict() for payout in self.current_payouts],
+            "notified_expired_claims": self.previous_state.get("notified_expired_claims", []) if self.previous_state else []
         }
+        
+        # Add newly expired claims to the notified list
+        for notif in self.notifications:
+            if notif['type'] == 'expired_claim' and notif['claim_id'] not in state['notified_expired_claims']:
+                state['notified_expired_claims'].append(notif['claim_id'])
         
         try:
             with open(self.state_file, 'w', encoding='utf-8') as f:
@@ -308,11 +478,14 @@ class ClassActionClaimsAgent:
         self.current_claims = active_claims
         return active_claims
     
-    def fetch_recent_payouts(self, days: int = 30) -> List[Payout]:
+    def fetch_recent_payouts(self, days: Optional[int] = None) -> List[Payout]:
         """
         Fetch recent payouts announced within specified days.
         In production, this would use real payout tracking APIs.
         """
+        if days is None:
+            days = self.recent_payout_window_days
+            
         payouts = generate_mock_payouts()
         
         # Filter for recent payouts
@@ -325,8 +498,11 @@ class ClassActionClaimsAgent:
         self.current_payouts = recent_payouts
         return recent_payouts
     
-    def detect_expiring_claims(self, days: int = 30) -> List[Claim]:
+    def detect_expiring_claims(self, days: Optional[int] = None) -> List[Claim]:
         """Detect claims expiring within specified days."""
+        if days is None:
+            days = self.expiring_window_days
+            
         expiring = []
         
         for claim in self.current_claims:
@@ -353,22 +529,53 @@ class ClassActionClaimsAgent:
         return expiring
     
     def detect_expired_claims(self) -> List[Claim]:
-        """Detect claims that have expired since last run."""
+        """
+        Detect claims that have expired since last run.
+        This includes:
+        1. Claims that were in previous fetch but not current (removed because expired)
+        2. Claims that are in current fetch but crossed their deadline since last run
+        """
         if not self.previous_state:
             return []
         
         expired = []
+        notified_expired = set(self.previous_state.get("notified_expired_claims", []))
+        
+        # Get previous claims
         prev_claims = [
             Claim.from_dict(c) 
             for c in self.previous_state.get("claims", [])
         ]
         
-        # Find claims that were active before but are now expired
-        current_ids = {claim.claim_id for claim in self.current_claims}
+        # Create lookup dictionaries
+        current_claims_by_id = {claim.claim_id: claim for claim in self.current_claims}
+        prev_claims_by_id = {claim.claim_id: claim for claim in prev_claims}
         
+        # Check all claims from previous state
         for prev_claim in prev_claims:
-            if prev_claim.claim_id not in current_ids and prev_claim.is_expired():
+            # Skip if we already notified about this expiration
+            if prev_claim.claim_id in notified_expired:
+                continue
+            
+            # Case 1: Claim was not expired in previous run but is now expired
+            if not prev_claim.is_expired() and datetime.now() > prev_claim.filing_deadline:
                 expired.append(prev_claim)
+            # Case 2: Claim is missing from current fetch and was expired
+            elif prev_claim.claim_id not in current_claims_by_id and prev_claim.is_expired():
+                expired.append(prev_claim)
+        
+        # Also check current claims that may have expired since last run
+        for claim in self.current_claims:
+            # Skip if already notified
+            if claim.claim_id in notified_expired:
+                continue
+                
+            # If claim exists in both but was not expired before and is now expired
+            if claim.claim_id in prev_claims_by_id:
+                prev_claim = prev_claims_by_id[claim.claim_id]
+                if not prev_claim.is_expired() and claim.is_expired():
+                    # Claim crossed deadline between runs
+                    expired.append(claim)
         
         return expired
     
@@ -395,7 +602,7 @@ class ClassActionClaimsAgent:
         notifications = []
         
         # Notify about expiring claims
-        expiring = self.detect_expiring_claims(days=30)
+        expiring = self.detect_expiring_claims()
         for claim in expiring:
             days_left = (claim.filing_deadline - datetime.now()).days
             notifications.append({
@@ -440,10 +647,13 @@ class ClassActionClaimsAgent:
         self.notifications = notifications
         return notifications
     
-    def run(self) -> Dict[str, Any]:
+    def run(self, skip_report: bool = False) -> Dict[str, Any]:
         """
         Run the agent to check for updates.
         Returns summary of findings and notifications.
+        
+        Args:
+            skip_report: If True, don't write JSON report file
         """
         # Load previous state
         self.load_previous_state()
@@ -454,6 +664,10 @@ class ClassActionClaimsAgent:
         
         # Generate notifications for changes
         notifications = self.generate_notifications()
+        
+        # Send notifications (only if there are changes)
+        if notifications:
+            self.notifier.send(notifications, {"notifications": notifications})
         
         # Save current state for next run
         self.save_current_state()
@@ -466,7 +680,7 @@ class ClassActionClaimsAgent:
             "notifications_count": len(notifications),
             "notifications": notifications,
             "claims_by_category": self.get_claims_by_category(),
-            "expiring_soon": len([c for c in active_claims if c.is_expiring_soon(30)])
+            "expiring_soon": len([c for c in active_claims if c.is_expiring_soon(self.expiring_window_days)])
         }
         
         return summary
@@ -552,23 +766,128 @@ class ClassActionClaimsAgent:
 
 
 # ============================================================================
+# CLI PARSER
+# ============================================================================
+
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description='Class Action Claims Agent - Monitor claims and payouts',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run with default settings
+  python class_action_claims_agent.py
+
+  # Customize expiring window to 14 days
+  python class_action_claims_agent.py --expiring-days 14
+
+  # Use custom state file and report path
+  python class_action_claims_agent.py --state-file /tmp/state.json --report-path /tmp/report.json
+
+  # Skip writing report file
+  python class_action_claims_agent.py --skip-report
+
+  # Enable email notifications (requires SMTP env vars)
+  python class_action_claims_agent.py --notify-email
+
+Environment Variables:
+  CLASS_ACTION_STATE_FILE  State file path (default: class_action_state.json)
+  SMTP_HOST                SMTP server hostname
+  SMTP_PORT                SMTP server port (default: 587)
+  SMTP_USERNAME            SMTP username (optional)
+  SMTP_PASSWORD            SMTP password (optional)
+  SMTP_FROM                From email address
+  SMTP_TO                  To email address
+        """
+    )
+    
+    parser.add_argument(
+        '--state-file',
+        type=str,
+        default=None,
+        help='Path to state file (default: env CLASS_ACTION_STATE_FILE or class_action_state.json)'
+    )
+    
+    parser.add_argument(
+        '--report-path',
+        type=str,
+        default=None,
+        help='Path to write JSON report (default: class_action_report_TIMESTAMP.json)'
+    )
+    
+    parser.add_argument(
+        '--expiring-days',
+        type=int,
+        default=DEFAULT_EXPIRING_WINDOW_DAYS,
+        help=f'Days window for expiring claims (default: {DEFAULT_EXPIRING_WINDOW_DAYS})'
+    )
+    
+    parser.add_argument(
+        '--payout-days',
+        type=int,
+        default=DEFAULT_RECENT_PAYOUT_WINDOW_DAYS,
+        help=f'Days window for recent payouts (default: {DEFAULT_RECENT_PAYOUT_WINDOW_DAYS})'
+    )
+    
+    parser.add_argument(
+        '--skip-report',
+        action='store_true',
+        help='Skip writing JSON report file'
+    )
+    
+    parser.add_argument(
+        '--notify-email',
+        action='store_true',
+        help='Send email notifications (requires SMTP env vars)'
+    )
+    
+    return parser.parse_args()
+
+
+# ============================================================================
 # MAIN FUNCTION
 # ============================================================================
 
 def main():
     """Main function to run the class action claims agent."""
+    args = parse_args()
+    
     print("=" * 80)
     print("CLASS ACTION CLAIMS AGENT")
     print("Monitoring Active Claims and Payouts")
     print("=" * 80)
     print()
     
+    # Setup notifier
+    notifier = None
+    if args.notify_email:
+        try:
+            notifier = EmailNotifier()
+            print("📧 Email notifications enabled")
+        except ValueError as e:
+            print(f"⚠️  Email notification setup failed: {e}")
+            print("   Falling back to console notifications")
+            notifier = ConsoleNotifier()
+    else:
+        notifier = ConsoleNotifier()
+    
     # Initialize agent
-    agent = ClassActionClaimsAgent()
+    agent = ClassActionClaimsAgent(
+        state_file=args.state_file,
+        expiring_window_days=args.expiring_days,
+        recent_payout_window_days=args.payout_days,
+        notifier=notifier
+    )
+    
+    print(f"📁 State file: {agent.state_file}")
+    print(f"⏰ Expiring window: {args.expiring_days} days")
+    print(f"💰 Payout window: {args.payout_days} days")
+    print()
     
     # Run agent
     print("🔍 Scanning for active claims and payouts...")
-    summary = agent.run()
+    summary = agent.run(skip_report=args.skip_report)
     
     # Display report
     print()
@@ -576,8 +895,8 @@ def main():
     print(report)
     
     # Export report
-    if summary['notifications']:
-        filename = agent.export_report(summary)
+    if not args.skip_report and summary['notifications']:
+        filename = agent.export_report(summary, args.report_path)
         print(f"\n📄 Report exported to: {filename}")
     
     # Display claims by category
@@ -590,28 +909,6 @@ def main():
     print("\n" + "=" * 80)
     print("✅ AGENT RUN COMPLETE")
     print("=" * 80)
-    print("""
-💡 USAGE NOTES:
-  • Run this agent daily to track changes
-  • Notifications are only sent when there are changes:
-    - Claims expiring within 30 days
-    - Claims that have expired since last run
-    - New payouts announced
-  • State is saved between runs to track changes
-  • To reset: delete class_action_state.json
-
-📅 SCHEDULING:
-  • Linux/Mac: Use cron to schedule daily runs
-    Example: 0 9 * * * python3 class_action_claims_agent.py
-  • Windows: Use Task Scheduler
-  • Docker: Use cron or scheduled container runs
-
-🔌 INTEGRATION:
-  • Replace mock data functions with real APIs
-  • Popular sources: ClassAction.org, TopClassActions.com
-  • Add email/SMS notifications as needed
-  • Integrate with notification services (Slack, Discord, etc.)
-""")
 
 
 if __name__ == "__main__":

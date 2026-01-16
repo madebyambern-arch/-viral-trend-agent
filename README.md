@@ -23,12 +23,14 @@ Monitors active class action claims and payouts, tracks expiration dates, and se
 - 💰 **Payout Monitoring**: Tracks newly announced settlements and payouts
 - 📢 **Smart Notifications**: Only notifies when there are changes (no spam!)
 - 💾 **State Persistence**: Remembers previous runs to detect changes
-- 🗓️ **Daily Scheduling**: Designed to run as a daily automated task
+- 🗓️ **Daily Scheduling**: Designed to run as a daily automated task via GitHub Actions
 - 📊 **Detailed Reports**: Generates comprehensive JSON reports
+- 📧 **Email Notifications**: Built-in SMTP email support with STARTTLS
+- 🛠️ **CLI Interface**: Configurable via command-line arguments
 
 ### Quick Start - Claims Agent
 
-Run the claims agent to check for updates:
+Run the claims agent with default settings:
 
 ```bash
 python3 class_action_claims_agent.py
@@ -42,9 +44,128 @@ python3 class_action_claims_agent.py
 
 **Subsequent Runs:**
 - Only shows NEW notifications:
-  - Claims becoming "expiring soon"
-  - Claims that expired since last run
+  - Claims newly entering the "expiring soon" window
+  - Claims that expired since last run (notified once)
   - Newly announced payouts
+
+### CLI Usage
+
+The agent supports various command-line options:
+
+```bash
+# View all available options
+python class_action_claims_agent.py --help
+
+# Customize expiring window to 14 days
+python class_action_claims_agent.py --expiring-days 14
+
+# Use custom state file and report path
+python class_action_claims_agent.py --state-file /tmp/state.json --report-path /tmp/report.json
+
+# Skip writing report file (useful for cron jobs with email notifications)
+python class_action_claims_agent.py --skip-report
+
+# Enable email notifications (requires SMTP environment variables)
+python class_action_claims_agent.py --notify-email
+
+# Combine options
+python class_action_claims_agent.py --expiring-days 14 --payout-days 7 --notify-email
+```
+
+### CLI Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--state-file PATH` | Path to state file | `class_action_state.json` or `$CLASS_ACTION_STATE_FILE` |
+| `--report-path PATH` | Path to write JSON report | `class_action_report_TIMESTAMP.json` |
+| `--expiring-days N` | Days window for expiring claims | 30 |
+| `--payout-days N` | Days window for recent payouts | 30 |
+| `--skip-report` | Skip writing JSON report file | False |
+| `--notify-email` | Send email notifications | False |
+
+### Email Notifications
+
+To enable email notifications, set the following environment variables:
+
+```bash
+# Required
+export SMTP_HOST="smtp.gmail.com"           # SMTP server hostname
+export SMTP_PORT="587"                       # SMTP port (default: 587)
+export SMTP_FROM="alerts@example.com"        # From email address
+export SMTP_TO="recipient@example.com"       # To email address
+
+# Optional (for authenticated SMTP)
+export SMTP_USERNAME="your-username"         # SMTP username
+export SMTP_PASSWORD="your-password"         # SMTP password
+
+# Run with email notifications
+python class_action_claims_agent.py --notify-email
+```
+
+**Email Features:**
+- Sends email only when there are changes (no empty notifications)
+- Supports STARTTLS for secure connections
+- Groups notifications by type (expiring, expired, new payouts)
+- Includes all relevant details (deadlines, amounts, URLs)
+
+**Example Email Notification:**
+```
+Subject: Class Action Claims Alert - 3 Update(s)
+
+CLASS ACTION CLAIMS DAILY ALERT
+======================================================================
+Date: 2026-01-16 09:00:00
+Total Updates: 3
+
+⚠️  EXPIRING CLAIMS (2):
+----------------------------------------------------------------------
+
+• ABC Electronics Product Defect Settlement
+  Claim expires in 14 days
+  Deadline: 2026-01-31
+  Amount: Up to $350 or replacement
+  URL: https://example.com/abc-settlement
+
+💰 NEW PAYOUTS (1):
+----------------------------------------------------------------------
+
+• MNO Bank Overdraft Fee Settlement Payout
+  Amount: $87.5 million total fund
+  Announced: 2026-01-14
+  Distribution: 2026-02-15
+  URL: https://example.com/mno-payout
+```
+
+### GitHub Actions Scheduling
+
+The repository includes a GitHub Actions workflow that runs the agent daily at 9:00 AM UTC.
+
+**Workflow File:** `.github/workflows/class-action-agent.yml`
+
+**Features:**
+- Runs daily via cron schedule: `0 9 * * *`
+- Can be manually triggered via workflow_dispatch
+- Uses only Python standard library (no external dependencies)
+- Uploads JSON report as artifact (90-day retention)
+- Uploads state file as artifact (7-day retention)
+
+**Setting Up Email Notifications in GitHub Actions:**
+
+1. Go to your repository Settings → Secrets and variables → Actions
+2. Add repository secrets:
+   - `SMTP_HOST`
+   - `SMTP_PORT`
+   - `SMTP_USERNAME`
+   - `SMTP_PASSWORD`
+   - `SMTP_FROM`
+   - `SMTP_TO`
+3. Uncomment the environment variables in the workflow file
+4. The agent will automatically send email notifications on changes
+
+**Manual Workflow Trigger:**
+1. Go to Actions tab in your repository
+2. Select "Class Action Claims Agent - Daily Run"
+3. Click "Run workflow"
 
 ### Example Output
 
@@ -52,7 +173,7 @@ python3 class_action_claims_agent.py
 ================================================================================
 CLASS ACTION CLAIMS AGENT - DAILY REPORT
 ================================================================================
-Run Date: 2026-01-16 07:08:35
+Run Date: 2026-01-16 09:00:00
 
 📊 SUMMARY
 --------------------------------------------------------------------------------
@@ -72,6 +193,12 @@ Notifications: 4
     Amount: Up to $350 or replacement
     URL: https://example.com/abc-settlement
 
+  • GHI Auto Airbag Recall Settlement
+    Claim expires in 5 days
+    Deadline: 2026-01-21
+    Amount: Up to $1,000
+    URL: https://example.com/ghi-settlement
+
 💰 NEW PAYOUTS:
 
   • MNO Bank Overdraft Fee Settlement Payout
@@ -79,14 +206,20 @@ Notifications: 4
     Announced: 2026-01-14
     Distribution: 2026-02-15
     URL: https://example.com/mno-payout
+
+  • PQR Retailer Price Fixing Settlement Payout
+    New payout announced: $125 million total fund
+    Announced: 2026-01-15
+    Distribution: 2026-03-01
+    URL: https://example.com/pqr-payout
 ```
 
-### Daily Scheduling
+### Daily Scheduling (Alternative to GitHub Actions)
 
 **Linux/Mac (cron):**
 ```bash
-# Run daily at 9 AM
-0 9 * * * cd /path/to/-viral-trend-agent && python3 class_action_claims_agent.py
+# Run daily at 9 AM with email notifications
+0 9 * * * cd /path/to/-viral-trend-agent && python3 class_action_claims_agent.py --notify-email
 ```
 
 **Windows (Task Scheduler):**
@@ -95,7 +228,7 @@ Notifications: 4
 3. Set trigger: Daily at 9:00 AM
 4. Action: Start a program
 5. Program: `python3`
-6. Arguments: `class_action_claims_agent.py`
+6. Arguments: `class_action_claims_agent.py --notify-email`
 7. Start in: `C:\path\to\-viral-trend-agent`
 
 ### Claims Categories
@@ -110,34 +243,64 @@ The agent monitors claims in these categories:
 - 🚗 Automotive
 - 📱 Telecommunications
 
-### Integration Examples
+### Testing
 
-**Email Notifications:**
-```python
-from class_action_claims_agent import ClassActionClaimsAgent
+Run the comprehensive test suite:
 
-agent = ClassActionClaimsAgent()
-summary = agent.run()
-
-for notif in summary['notifications']:
-    if notif['severity'] == 'high':
-        send_email_alert(notif)
+```bash
+python -m unittest test_class_action_claims_agent.py -v
 ```
 
-**Slack/Discord Webhooks:**
+**Test Coverage:**
+- Expiring claim detection (with deduplication)
+- Expired claim detection between runs
+- New payout detection
+- Notification generation (changes only)
+- State persistence
+- Email notifications (mocked SMTP)
+
+### Programmatic Usage
+
 ```python
+from class_action_claims_agent import ClassActionClaimsAgent, EmailNotifier
+
+# Option 1: Console notifications (default)
+agent = ClassActionClaimsAgent(
+    state_file="my_state.json",
+    expiring_window_days=14,
+    recent_payout_window_days=7
+)
+summary = agent.run()
+
+# Option 2: Email notifications
+email_notifier = EmailNotifier(
+    smtp_host="smtp.gmail.com",
+    smtp_port=587,
+    smtp_from="alerts@example.com",
+    smtp_to="recipient@example.com",
+    smtp_username="username",
+    smtp_password="password"
+)
+
+agent = ClassActionClaimsAgent(
+    notifier=email_notifier,
+    expiring_window_days=30
+)
+summary = agent.run()
+
+# Access notifications
 for notif in summary['notifications']:
-    webhook_url = "https://hooks.slack.com/..."
-    requests.post(webhook_url, json={"text": notif['message']})
+    print(f"{notif['type']}: {notif['title']}")
 ```
 
 ### Advanced Usage
 
 See `class_action_example_usage.py` for detailed examples including:
 - Filtering claims by category
-- Finding high-priority claims
+- Finding high-priority claims (expiring in 7 days)
 - Exporting reports
 - Custom integrations
+- Simulating daily run behavior
 
 ### Production Setup
 
@@ -153,11 +316,34 @@ To use real data instead of mock data:
    - JND Legal Administration
    - Settlement-specific websites
 
-3. **Add notification delivery:**
-   - Email (SMTP)
-   - SMS (Twilio)
-   - Slack/Discord webhooks
-   - Database logging
+3. **Configure notifications:**
+   - Set up SMTP environment variables for email
+   - Or implement custom Notifier subclass for Slack/Discord/SMS
+
+### How It Works
+
+**Change Detection Logic:**
+
+1. **Expiring Claims**: 
+   - Detects claims entering the expiring window (default 30 days)
+   - Only notifies once when a claim first enters the window
+   - Won't re-notify if claim stays in the window across runs
+
+2. **Expired Claims**:
+   - Detects claims that crossed their filing deadline between runs
+   - Handles both cases: claims still present or removed from fetch
+   - Only notifies once per claim using tracked list in state file
+
+3. **New Payouts**:
+   - Detects payouts announced within window (default 30 days)
+   - Compares against previous state to identify new announcements
+   - First run treats all recent payouts as "new"
+
+**State Persistence:**
+- State saved in JSON file after each run
+- Tracks: claims, payouts, last run time, notified expired claims
+- Used to detect changes between runs
+- Can be overridden via CLI or environment variable
 
 ---
 
